@@ -1,10 +1,12 @@
 using System;
+using Microsoft.Win32;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.IsolatedStorage;
 using System.Management;
 using System.Threading.Tasks;
+using System.Linq;
 using System.Windows;
 using WinMedia = System.Windows.Media;
 using WinForms = System.Windows.Forms;
@@ -15,6 +17,8 @@ namespace ArkVRInstaller
     public partial class MainWindow : Window
     {
         private const string LastPathKey = "LastArkPath.txt";
+        // Type de casque VR détecté : "ALVR", "WiVRn", "SteamVR", "Aucun"
+        private string _casqueVrDetecte = "Aucun";
 
         public MainWindow()
         {
@@ -28,6 +32,159 @@ namespace ArkVRInstaller
             LoadLastPath();
             DetectGpuAndSetProfile();
             DetectUevrVersion();
+            // Détection du casque VR Quest 3 / ALVR / WiVRn
+            DetecterCasqueVR();
+        }
+
+        // ─── Detection Casque VR / Quest 3 ─────────────────────────────────────────
+        private void DetecterCasqueVR()
+        {
+            Task.Run(() =>
+            {
+                string casque = "Aucun";
+                string badge = "❌ Aucun client VR détecté";
+                string flux = "";
+                bool showALVR = true;
+
+                // 1. Recherche ALVR (AppData, LocalAppData, registre, EXE)
+                string alvrApp = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ALVR");
+                string alvrLocal = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ALVR");
+                bool alvrFound = Directory.Exists(alvrApp) || Directory.Exists(alvrLocal)
+                    || VerifierRegistreApp("ALVR") || TrouverExeVR("ALVR");
+
+                if (alvrFound)
+                {
+                    casque = "ALVR";
+                    badge = "✅ ALVR détecté (streaming Quest)";
+                    flux = "Quest 3 → Wi-Fi 6 → ALVR → SteamVR → ARK VR";
+                    showALVR = false;
+                }
+
+                // 2. Recherche WiVRn
+                if (casque == "Aucun")
+                {
+                    string wivrnPath = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "WiVRn");
+                    bool wivrnFound = Directory.Exists(wivrnPath)
+                        || VerifierRegistreApp("WiVRn") || TrouverExeVR("WiVRn");
+                    if (wivrnFound)
+                    {
+                        casque = "WiVRn";
+                        badge = "✅ WiVRn détecté (streaming open-source)";
+                        flux = "Quest 3 → Wi-Fi 6 → WiVRn → OpenXR → ARK VR";
+                        showALVR = false;
+                    }
+                }
+
+                // 3. SteamVR natif (filé)
+                if (casque == "Aucun")
+                {
+                    try
+                    {
+                        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Valve\SteamVR");
+                        if (key != null)
+                        {
+                            casque = "SteamVR";
+                            badge = "✅ SteamVR détecté (filé / Index / Vive)";
+                            flux = "Casque → USB/DP → SteamVR → UEVR → ARK VR";
+                            showALVR = false;
+                        }
+                    }
+                    catch { }
+                }
+
+                _casqueVrDetecte = casque;
+
+                Dispatcher.Invoke(() =>
+                {
+                    TxtCasqueBadgeARK.Text = badge;
+                    TxtFluxVRARK.Text = flux;
+
+                    BadgeCasqueARK.Background = casque == "Aucun"
+                        ? WinMedia.Brushes.DarkRed
+                        : new WinMedia.SolidColorBrush(WinMedia.Color.FromRgb(0, 60, 20));
+                    TxtCasqueBadgeARK.Foreground = casque == "Aucun"
+                        ? WinMedia.Brushes.OrangeRed
+                        : WinMedia.Brushes.LightGreen;
+
+                    // Activer checkbox Quest 3 si ALVR ou WiVRn trouvé
+                    if (casque == "ALVR" || casque == "WiVRn")
+                    {
+                        ChkQuest3Optimize.IsChecked = true;
+                        ChkQuest3Optimize.IsEnabled = true;
+                    }
+
+                    BtnInstallALVR.Visibility = showALVR ? Visibility.Visible : Visibility.Collapsed;
+                    LogLine($"[VR] {badge}", casque == "Aucun" ? "#FF6B6B" : "#00FF88");
+                });
+            });
+        }
+
+        // Vérifie si une application est installée via le registre Windows
+        private static bool VerifierRegistreApp(string nomApp)
+        {
+            string[] paths = {
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                @"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+            };
+            foreach (var path in paths)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(path);
+                    if (key == null) continue;
+                    foreach (var sub in key.GetSubKeyNames())
+                    {
+                        using var subKey = key.OpenSubKey(sub);
+                        var name = subKey?.GetValue("DisplayName") as string;
+                        if (name != null && name.Contains(nomApp, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    }
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        // Cherche un EXE par nom dans Program Files et AppData
+        private static bool TrouverExeVR(string nom)
+        {
+            string[] roots = {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            };
+            foreach (var root in roots)
+            {
+                if (string.IsNullOrEmpty(root)) continue;
+                try
+                {
+                    bool found = Directory.EnumerateFiles(root, $"*{nom}*.exe", SearchOption.AllDirectories)
+                        .Take(1).Any();
+                    if (found) return true;
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        // Ouvre la page de téléchargement ALVR
+        private void BtnInstallALVR_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(
+                    "https://github.com/alvr-org/ALVR/releases/latest") { UseShellExecute = true });
+                LogLine("[VR] Page ALVR ouverte dans le navigateur.", "#00D0FF");
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(
+                    $"Impossible d'ouvrir le navigateur :\n{ex.Message}",
+                    "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            }
         }
 
         // ─── Detection GPU ──────────────────────────────────────────────────────

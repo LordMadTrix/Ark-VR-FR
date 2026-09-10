@@ -235,6 +235,40 @@
                     </StackPanel>
                 </Border>
 
+
+                <!-- Carte : Casque VR / Quest 3 / ALVR -->
+                <Border Style="{StaticResource CardPanel}" Background="#060F18" BorderBrush="#0A2535">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Titre + badge casque -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="🥽 CASQUE VR DETECTE :" FontWeight="Bold" FontSize="12" Foreground="#00F0FF" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <Border x:Name="BadgeCasqueARK" Background="#0A1E2A" CornerRadius="4" Padding="10,3" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtCasqueBadgeARK" Text="🔍 Analyse..." FontSize="11" FontWeight="Bold" Foreground="#00D0FF" />
+                                </Border>
+                            </StackPanel>
+
+                            <!-- CheckBox Quest 3 -->
+                            <StackPanel Grid.Column="1" Orientation="Vertical" VerticalAlignment="Center">
+                                <CheckBox x:Name="ChkQuest3Optimize" Content="⚡ Optimiser pour Quest 3 (Wi-Fi 6, 120Hz, H.265 — via ALVR / WiVRn)" Foreground="#C0D8E8"
+                                          FontSize="12" IsChecked="False"
+                                          ToolTip="Active les parametres optimaux pour Quest 3 : 120Hz, encode H.265, bitrate 200 Mbps. Requiert ALVR ou WiVRn installe sur le PC." />
+                                <TextBlock x:Name="TxtFluxVRARK" Text="" FontSize="10" Foreground="#4A6A7A" Margin="20,3,0,0" />
+                            </StackPanel>
+
+                            <!-- Bouton telecharger ALVR -->
+                            <Button x:Name="BtnInstallALVR" Grid.Column="2" Content="⬇ Installer ALVR" Style="{StaticResource DarkButton}" Foreground="#00D0FF" BorderBrush="#004A6A"
+                                    Visibility="Collapsed" Click="BtnInstallALVR_Click"
+                                    ToolTip="Ouvre la page GitHub de la derniere release ALVR (client streaming Quest 3 open-source et gratuit)." />
+                        </Grid>
+                    </StackPanel>
+                </Border>
                 <!-- Carte : Modules Immersifs -->
                 <Border Style="{StaticResource CardPanel}">
                     <StackPanel>
