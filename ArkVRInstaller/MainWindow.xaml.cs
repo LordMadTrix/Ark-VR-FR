@@ -1,262 +1,380 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
-using System.Reflection;
+using System.IO.IsolatedStorage;
+using System.Management;
 using System.Threading.Tasks;
 using System.Windows;
-using Microsoft.Win32;
+using WinMedia = System.Windows.Media;
+using WinForms = System.Windows.Forms;
+using WinControls = System.Windows.Controls;
 
 namespace ArkVRInstaller
 {
     public partial class MainWindow : Window
     {
-        private string? _detectedArkPath;
+        private const string LastPathKey = "LastArkPath.txt";
 
         public MainWindow()
         {
             InitializeComponent();
-            Loaded += MainWindow_Loaded;
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            DetectArkInstallation();
+            LogLine("INFO  ARK VR Installateur v1.3.0 - LordMadTrix", "#00F0FF");
+            LogLine("─────────────────────────────────────────────", "#1A3040");
+            LoadLastPath();
+            DetectGpuAndSetProfile();
+            DetectUevrVersion();
         }
 
-        private void DetectArkInstallation()
+        // ─── Detection GPU ──────────────────────────────────────────────────────
+        private void DetectGpuAndSetProfile()
         {
-            string[] possiblePaths = new[]
+            Task.Run(() =>
             {
-                @"D:\SteamLibrary\steamapps\common\ARK",
-                @"C:\Program Files (x86)\Steam\steamapps\common\ARK",
-                @"C:\SteamLibrary\steamapps\common\ARK",
-                @"E:\SteamLibrary\steamapps\common\ARK",
-                @"F:\SteamLibrary\steamapps\common\ARK"
-            };
-
-            foreach (var path in possiblePaths)
-            {
-                if (IsValidArkFolder(path))
+                try
                 {
-                    _detectedArkPath = path;
-                    TxtGamePath.Text = path;
-                    TxtDetectStatus.Text = "✅ ARK: Survival Evolved détecté avec succès !";
-                    TxtDetectStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
-                    return;
+                    string gpuName = "GPU inconnu";
+                    int vramMb = 0;
+
+                    using var searcher = new ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
+                    foreach (ManagementObject obj in searcher.Get())
+                    {
+                        gpuName = obj["Name"]?.ToString() ?? "GPU inconnu";
+                        if (obj["AdapterRAM"] != null)
+                            vramMb = (int)((ulong)obj["AdapterRAM"] / (1024 * 1024));
+                        break;
+                    }
+
+                    string profileLabel;
+                    Action selectProfile;
+
+                    if (gpuName.Contains("4090") || gpuName.Contains("4080") || gpuName.Contains("4070 Ti"))
+                    {
+                        profileLabel = "Ultra (auto)";
+                        selectProfile = () => { RadioUltra.IsChecked = true; };
+                    }
+                    else if (gpuName.Contains("3080") || gpuName.Contains("3090") || gpuName.Contains("4070")
+                          || gpuName.Contains("6800") || gpuName.Contains("6900") || gpuName.Contains("7900"))
+                    {
+                        profileLabel = "Equilibre (auto)";
+                        selectProfile = () => { RadioBalanced.IsChecked = true; };
+                    }
+                    else if (gpuName.Contains("3060") || gpuName.Contains("3070") || gpuName.Contains("6700"))
+                    {
+                        profileLabel = "Equilibre (auto)";
+                        selectProfile = () => { RadioBalanced.IsChecked = true; };
+                    }
+                    else
+                    {
+                        profileLabel = "Eco (auto)";
+                        selectProfile = () => { RadioEco.IsChecked = true; };
+                    }
+
+                    int vramGb = vramMb / 1024;
+                    string vramStr = vramGb > 0 ? $"{vramGb} Go VRAM" : "VRAM inconnu";
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        TxtGpuInfo.Text = $"GPU  {gpuName} - {vramStr}";
+                        TxtGpuInfo.Foreground = new WinMedia.SolidColorBrush(WinMedia.Color.FromRgb(0, 200, 150));
+                        TxtAutoProfile.Text = $"Profil auto : {profileLabel}";
+                        selectProfile();
+                        if (vramGb >= 8) ChkHighQualityTextures.IsChecked = true;
+                    });
+
+                    LogLine($"GPU detecte : {gpuName} ({vramStr}) -> profil {profileLabel}", "#00FF88");
                 }
-            }
-
-            TxtDetectStatus.Text = "⚠️ ARK non détecté automatiquement. Cliquez sur 'Parcourir...'";
-            TxtDetectStatus.Foreground = System.Windows.Media.Brushes.Orange;
-        }
-
-        private bool IsValidArkFolder(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return false;
-            string exe = Path.Combine(path, @"ShooterGame\Binaries\Win64\ShooterGame.exe");
-            return File.Exists(exe);
-        }
-
-        private void BtnBrowse_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new OpenFolderDialog
-            {
-                Title = "Sélectionnez le dossier principal de votre jeu ARK",
-                InitialDirectory = Directory.Exists(TxtGamePath.Text) ? TxtGamePath.Text : @"C:\"
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                string chosen = dialog.FolderName;
-                if (IsValidArkFolder(chosen))
+                catch (Exception ex)
                 {
-                    _detectedArkPath = chosen;
-                    TxtGamePath.Text = chosen;
-                    TxtDetectStatus.Text = "✅ Dossier ARK valide !";
-                    TxtDetectStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
+                    Dispatcher.Invoke(() => TxtGpuInfo.Text = "Detection GPU indisponible");
+                    LogLine($"Detection GPU : {ex.Message}", "#FF9800");
                 }
-                else
-                {
-                    MessageBox.Show(
-                        "Le dossier sélectionné ne contient pas ShooterGame\\Binaries\\Win64\\ShooterGame.exe.\nVérifiez qu'il s'agit bien du dossier 'ARK' de votre bibliothèque Steam.",
-                        "Dossier invalide",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning
-                    );
-                }
-            }
+            });
         }
 
-        private async void BtnInstall_Click(object sender, RoutedEventArgs e)
+        // ─── Detection UEVR ─────────────────────────────────────────────────────
+        private void DetectUevrVersion()
         {
-            string targetPath = TxtGamePath.Text.Trim();
-            if (!IsValidArkFolder(targetPath))
+            Task.Run(() =>
             {
-                MessageBox.Show(
-                    "Veuillez sélectionner un dossier ARK valide contenant ShooterGame.exe avant de lancer l'installation.",
-                    "Erreur de dossier",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-                return;
-            }
+                try
+                {
+                    string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    string uevrExe = Path.Combine(appData, @"uevr\UEVRInjector.exe");
+                    if (File.Exists(uevrExe))
+                    {
+                        var info = FileVersionInfo.GetVersionInfo(uevrExe);
+                        string ver = info.FileVersion ?? "installe";
+                        Dispatcher.Invoke(() =>
+                        {
+                            TxtUevrBadge.Text = $"UEVR {ver}";
+                            BadgeUEVR.Visibility = Visibility.Visible;
+                        });
+                        LogLine($"UEVR detecte : version {ver}", "#00FF88");
+                    }
+                    else
+                    {
+                        LogLine("UEVR non detecte dans AppData - sera installe lors du deploiement.", "#8FA7B3");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogLine($"Detection UEVR : {ex.Message}", "#FF9800");
+                }
+            });
+        }
 
-            BtnInstall.IsEnabled = false;
-            BtnLaunch.IsEnabled = false;
-            BtnRestore.IsEnabled = false;
-
+        // ─── Memoire chemin ─────────────────────────────────────────────────────
+        private void LoadLastPath()
+        {
             try
             {
-                await Task.Run(() => PerformInstallation(targetPath));
-                MessageBox.Show(
-                    "🎉 Félicitations ! ARK VR (Édition Française v1.2.0) a été installé et configuré avec succès !\n\nOptions actives :\n- Rendu Stéréoscopique Synced Sequential\n- Montures Dinosaures 6DOF (T-Rex & Ptéranodon)\n- Viseur Laser Tek 3D et Vignette Anti-Cinétose\n- Optimisations FPS sans nuages bugués\n\nVous pouvez désormais allumer votre casque VR et cliquer sur '🥽 LANCER EN VR'.",
-                    "Installation réussie",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information
-                );
+                using var store = IsolatedStorageFile.GetUserStoreForAssembly();
+                if (store.FileExists(LastPathKey))
+                {
+                    using var sr = new StreamReader(new IsolatedStorageFileStream(LastPathKey, FileMode.Open, store));
+                    string saved = sr.ReadLine()?.Trim() ?? "";
+                    if (!string.IsNullOrEmpty(saved) && Directory.Exists(saved))
+                    {
+                        TxtGamePath.Text = saved;
+                        ValidateArkPath(saved);
+                        LogLine($"Chemin restaure : {saved}", "#8FA7B3");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Une erreur est survenue lors du déploiement :\n{ex.Message}",
-                    "Erreur d'installation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error
-                );
-            }
-            finally
-            {
-                BtnInstall.IsEnabled = true;
-                BtnLaunch.IsEnabled = true;
-                BtnRestore.IsEnabled = true;
+                LogLine($"Chargement chemin : {ex.Message}", "#FF9800");
             }
         }
 
-        private void PerformInstallation(string arkPath)
+        private void SaveLastPath(string path)
         {
-            UpdateStatus("Extraction des modules VR et runtime UEVR...", 15);
+            try
+            {
+                using var store = IsolatedStorageFile.GetUserStoreForAssembly();
+                using var sw = new StreamWriter(new IsolatedStorageFileStream(LastPathKey, FileMode.Create, store));
+                sw.WriteLine(path);
+            }
+            catch (Exception ex)
+            {
+                LogLine($"Sauvegarde chemin : {ex.Message}", "#FF9800");
+            }
+        }
 
-            string win64Dir = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64");
-            string uevrDestDir = Path.Combine(win64Dir, "uevr");
-            Directory.CreateDirectory(uevrDestDir);
+        // ─── Navigation ─────────────────────────────────────────────────────────
+        private void BtnBrowse_Click(object sender, RoutedEventArgs e)
+        {
+            using var dialog = new WinForms.FolderBrowserDialog
+            {
+                Description = "Selectionnez le dossier racine d'ARK: Survival Evolved",
+                UseDescriptionForTitle = true
+            };
+            if (!string.IsNullOrEmpty(TxtGamePath.Text) && Directory.Exists(TxtGamePath.Text))
+                dialog.SelectedPath = TxtGamePath.Text;
 
-            // 1. Extraire le payload embarqué
-            string tempZip = Path.Combine(Path.GetTempPath(), $"ArkVRPayload_{Guid.NewGuid():N}.zip");
-            string tempExtract = Path.Combine(Path.GetTempPath(), $"ArkVRPayload_{Guid.NewGuid():N}");
+            if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                TxtGamePath.Text = dialog.SelectedPath;
+                ValidateArkPath(dialog.SelectedPath);
+            }
+        }
+
+        private void BtnOpenFolder_Click(object sender, RoutedEventArgs e)
+        {
+            string path = TxtGamePath.Text.Trim();
+            if (Directory.Exists(path))
+                Process.Start(new ProcessStartInfo { FileName = "explorer.exe", Arguments = $"\"{path}\"", UseShellExecute = true });
+            else
+                LogLine("Dossier invalide - impossible d'ouvrir l'explorateur.", "#FF5252");
+        }
+
+        private void BtnClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            LogConsole.Items.Clear();
+        }
+
+        // ─── Validation ARK ─────────────────────────────────────────────────────
+        private bool IsValidArkFolder(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            return File.Exists(Path.Combine(path, @"ShooterGame\Binaries\Win64\ShooterGame.exe"));
+        }
+
+        private void ValidateArkPath(string path)
+        {
+            if (IsValidArkFolder(path))
+            {
+                TxtDetectStatus.Text = "OK ARK: Survival Evolved detecte avec succes !";
+                TxtDetectStatus.Foreground = new WinMedia.SolidColorBrush(WinMedia.Color.FromRgb(0, 255, 136));
+                SaveLastPath(path);
+            }
+            else
+            {
+                TxtDetectStatus.Text = "ERR ShooterGame.exe introuvable - verifiez le chemin.";
+                TxtDetectStatus.Foreground = new WinMedia.SolidColorBrush(WinMedia.Color.FromRgb(255, 82, 82));
+            }
+        }
+
+        // ─── Installation ───────────────────────────────────────────────────────
+        private async void BtnInstall_Click(object sender, RoutedEventArgs e)
+        {
+            string arkPath = TxtGamePath.Text.Trim();
+            if (!IsValidArkFolder(arkPath))
+            {
+                System.Windows.MessageBox.Show("Dossier ARK invalide. Veuillez verifier le chemin.", "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+            BtnInstall.IsEnabled = false;
+            BtnLaunch.IsEnabled = false;
+            try { await Task.Run(() => RunInstall(arkPath)); }
+            finally
+            {
+                Dispatcher.Invoke(() => { BtnInstall.IsEnabled = true; BtnLaunch.IsEnabled = true; });
+            }
+        }
+
+        private void RunInstall(string arkPath)
+        {
+            string tempZip = Path.Combine(Path.GetTempPath(), "ark_vr_payload.zip");
+            string tempExtract = Path.Combine(Path.GetTempPath(), "ark_vr_extract");
 
             try
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                using (Stream? stream = assembly.GetManifestResourceStream("ArkVRInstaller.payload.zip"))
+                // 1. Payload
+                UpdateStatus("Extraction du payload UEVR...", 10);
+                LogLine("Extraction du payload embarque...", "#8FA7B3");
+
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                string payloadZip = Path.Combine(exeDir, "payload.zip");
+                if (!File.Exists(payloadZip))
+                    payloadZip = Path.GetFullPath(Path.Combine(exeDir, @"..\..\..\payload.zip"));
+
+                if (File.Exists(payloadZip))
                 {
-                    if (stream == null)
-                    {
-                        throw new InvalidOperationException("La ressource interne payload.zip est introuvable.");
-                    }
-                    using (FileStream fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write))
-                    {
-                        stream.CopyTo(fs);
-                    }
+                    File.Copy(payloadZip, tempZip, true);
+                    LogLine($"Payload trouve : {new FileInfo(tempZip).Length / 1024} Ko", "#00FF88");
+                }
+                else
+                    LogLine("Payload non trouve - extraction UEVR ignoree.", "#FF9800");
+
+                // 2. Installer UEVR
+                UpdateStatus("Deploiement UEVR dans le dossier du jeu...", 30);
+                LogLine("Deploiement UEVR...", "#8FA7B3");
+
+                string win64 = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64");
+                string uevrDir = Path.Combine(win64, "uevr");
+                Directory.CreateDirectory(uevrDir);
+
+                if (File.Exists(tempZip))
+                {
+                    if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true);
+                    System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, tempExtract);
+                    CopyDirectory(tempExtract, uevrDir);
+                    LogLine($"UEVR installe dans : {uevrDir}", "#00FF88");
                 }
 
-                ZipFile.ExtractToDirectory(tempZip, tempExtract, true);
+                // 3. Config UEVR
+                UpdateStatus("Configuration des options VR...", 55);
+                LogLine("Configuration des options VR...", "#8FA7B3");
 
-                UpdateStatus("Copie des binaires UEVR OpenXR...", 40);
-
-                // Copie des fichiers UEVR dans ShooterGame\Binaries\Win64\uevr
-                string payloadUevr = Path.Combine(tempExtract, "uevr");
-                if (Directory.Exists(payloadUevr))
-                {
-                    CopyDirectory(payloadUevr, uevrDestDir);
-                }
-
-                UpdateStatus("Configuration du profil 6DOF, Dinosaures & Laser...", 65);
-
-                // 2. Déployer le profil UEVR dans %APPDATA%\uevr\profiles\ShooterGame\
                 string appDataUevr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"uevr\profiles\ShooterGame");
                 Directory.CreateDirectory(appDataUevr);
 
-                string configSource = Path.Combine(tempExtract, @"config\ShooterGame_config.txt");
-                if (File.Exists(configSource))
+                string configContent = "[VRSettings]\nVR_SyncedSequentialEnabled=1\nVR_DinoMountCamera=1\nVR_ComfortVignette=1\nVR_LaserPointerEnabled=1\nVR_FlyingMountBankRoll=1\n";
+
+                Dispatcher.Invoke(() =>
                 {
-                    string configContent = File.ReadAllText(configSource);
+                    if (ChkSyncedSequential.IsChecked == false) configContent = configContent.Replace("VR_SyncedSequentialEnabled=1", "VR_SyncedSequentialEnabled=0");
+                    if (ChkDinoCamera.IsChecked == false) configContent = configContent.Replace("VR_DinoMountCamera=1", "VR_DinoMountCamera=0");
+                    if (ChkVignette.IsChecked == false) configContent = configContent.Replace("VR_ComfortVignette=1", "VR_ComfortVignette=0");
+                    if (ChkLaserSight.IsChecked == false) configContent = configContent.Replace("VR_LaserPointerEnabled=1", "VR_LaserPointerEnabled=0");
+                    if (ChkPteroRoll.IsChecked == false) configContent = configContent.Replace("VR_FlyingMountBankRoll=1", "VR_FlyingMountBankRoll=0");
+                });
 
-                    // Ajustements selon les choix de l'utilisateur
-                    Dispatcher.Invoke(() =>
-                    {
-                        if (ChkSyncedSequential.IsChecked == false)
-                        {
-                            configContent = configContent.Replace("VR_RenderingMethod=1", "VR_RenderingMethod=0");
-                        }
-                        if (ChkVignette.IsChecked == false)
-                        {
-                            configContent = configContent.Replace("VR_ComfortVignette=1", "VR_ComfortVignette=0");
-                        }
-                        if (ChkLaserSight.IsChecked == false)
-                        {
-                            configContent = configContent.Replace("VR_LaserPointerEnabled=1", "VR_LaserPointerEnabled=0");
-                        }
-                        if (ChkPteroRoll.IsChecked == false)
-                        {
-                            configContent = configContent.Replace("VR_FlyingMountBankRoll=1", "VR_FlyingMountBankRoll=0");
-                        }
-                    });
+                File.WriteAllText(Path.Combine(appDataUevr, "config.txt"), configContent);
+                LogLine("Config UEVR ecrite.", "#00FF88");
 
-                    File.WriteAllText(Path.Combine(appDataUevr, "config.txt"), configContent);
-                }
-
-                UpdateStatus("Application des optimisations graphiques VR...", 85);
-
-                // 3. Injecter les optimisations dans Engine.ini
+                // 4. Engine.ini
+                UpdateStatus("Application des optimisations graphiques VR...", 70);
                 string savedConfigDir = Path.Combine(arkPath, @"ShooterGame\Saved\Config\WindowsNoEditor");
                 Directory.CreateDirectory(savedConfigDir);
                 string engineIniPath = Path.Combine(savedConfigDir, "Engine.ini");
 
-                bool disableClouds = false;
-                Dispatcher.Invoke(() => disableClouds = ChkDisableClouds.IsChecked == true);
-
-                if (disableClouds)
+                bool doBackup = false, disableClouds = false, highTex = false, noMotionBlur = false;
+                Dispatcher.Invoke(() =>
                 {
-                    ApplyEngineTweaks(engineIniPath);
+                    doBackup = ChkBackupIni.IsChecked == true;
+                    disableClouds = ChkDisableClouds.IsChecked == true;
+                    highTex = ChkHighQualityTextures.IsChecked == true;
+                    noMotionBlur = ChkDisableMotionBlur.IsChecked == true;
+                });
+
+                if (doBackup && File.Exists(engineIniPath))
+                {
+                    File.Copy(engineIniPath, engineIniPath + ".bak", true);
+                    LogLine("Backup Engine.ini cree : Engine.ini.bak", "#8FA7B3");
                 }
 
-                // 4. Raccourcis Bureau et scripts d'automatisation
+                if (disableClouds || noMotionBlur || highTex)
+                {
+                    ApplyEngineTweaks(engineIniPath, disableClouds, noMotionBlur, highTex);
+                    LogLine("Engine.ini optimise pour la VR.", "#00FF88");
+                }
+
+                // 5. Raccourcis
+                UpdateStatus("Creation des raccourcis...", 88);
                 bool createShortcut = false;
                 Dispatcher.Invoke(() => createShortcut = ChkDesktopShortcut.IsChecked == true);
-                if (createShortcut)
-                {
-                    CreateDesktopShortcuts(arkPath);
-                }
+                if (createShortcut) { CreateDesktopShortcuts(arkPath); LogLine("Raccourcis Bureau crees.", "#00FF88"); }
 
-                UpdateStatus("✅ Installation terminée et prête pour la Réalité Virtuelle !", 100);
+                UpdateStatus("Installation terminee et prete pour la Realite Virtuelle !", 100);
+                LogLine("─────────────────────────────────────────────", "#1A3040");
+                LogLine("ARK VR (FR) v1.3.0 installe avec succes !", "#00FF88");
+
+                Dispatcher.Invoke(() =>
+                    System.Windows.MessageBox.Show("ARK VR (Edition Francaise v1.3.0) installe avec succes !\n\nAllumez votre casque VR et cliquez sur LANCER EN VR.",
+                        "Installation reussie", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.None));
+            }
+            catch (Exception ex)
+            {
+                LogLine($"ERREUR : {ex.Message}", "#FF5252");
+                UpdateStatus($"Echec : {ex.Message}", 0);
+                Dispatcher.Invoke(() => System.Windows.MessageBox.Show($"Erreur lors de l'installation :\n{ex.Message}", "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error));
             }
             finally
             {
-                try
-                {
-                    if (File.Exists(tempZip)) File.Delete(tempZip);
-                    if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true);
-                }
-                catch { }
+                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch (Exception ex) { LogLine($"Nettoyage temp : {ex.Message}", "#FF9800"); }
+                try { if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true); } catch (Exception ex) { LogLine($"Nettoyage extract : {ex.Message}", "#FF9800"); }
             }
         }
 
-        private void ApplyEngineTweaks(string engineIniPath)
+        // ─── Tweaks Engine.ini ──────────────────────────────────────────────────
+        private void ApplyEngineTweaks(string engineIniPath, bool disableClouds, bool noMotionBlur, bool highTex)
         {
-            string tweaks = "\n[SystemSettings]\nr.VolumetricCloud=0\nr.TrueSkyQuality=0\nr.ShadowQuality=2\nr.ContactShadows=0\nr.LightShaftQuality=0\nr.BloomQuality=1\nr.MotionBlurQuality=0\nr.DepthOfFieldQuality=0\nr.ViewDistanceScale=1.2\nr.Streaming.PoolSize=4096\n";
+            var lines = new List<string> { "", "[SystemSettings]" };
+            if (disableClouds)
+            {
+                lines.Add("r.VolumetricCloud=0"); lines.Add("r.TrueSkyQuality=0");
+                lines.Add("r.LightShaftQuality=0"); lines.Add("r.BloomQuality=1");
+                lines.Add("r.ShadowQuality=2"); lines.Add("r.ContactShadows=0");
+                lines.Add("r.DepthOfFieldQuality=0"); lines.Add("r.ViewDistanceScale=1.2");
+            }
+            if (noMotionBlur) lines.Add("r.MotionBlurQuality=0");
+            lines.Add(highTex ? "r.Streaming.PoolSize=6144" : "r.Streaming.PoolSize=4096");
+
+            string tweaks = string.Join(Environment.NewLine, lines) + Environment.NewLine;
             if (File.Exists(engineIniPath))
             {
                 string existing = File.ReadAllText(engineIniPath);
-                if (!existing.Contains("r.VolumetricCloud"))
-                {
-                    File.AppendAllText(engineIniPath, tweaks);
-                }
+                if (!existing.Contains("[SystemSettings]")) File.AppendAllText(engineIniPath, tweaks);
+                else LogLine("Engine.ini deja configure - tweaks ignores.", "#8FA7B3");
             }
-            else
-            {
-                File.WriteAllText(engineIniPath, tweaks);
-            }
+            else File.WriteAllText(engineIniPath, tweaks);
         }
 
         private void CreateDesktopShortcuts(string arkPath)
@@ -264,101 +382,113 @@ namespace ArkVRInstaller
             try
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                string shortcutPath = Path.Combine(desktop, "ARK VR (FR).cmd");
-                string launchBat = $"@echo off\ntitle ARK VR - LordMadTrix\ncd /d \"{arkPath}\\ShooterGame\\Binaries\\Win64\"\nstart \"\" \"uevr\\UEVRInjector.exe\"\nstart /high \"\" \"ShooterGame.exe\" -NoBattlEye\nexit\n";
-                File.WriteAllText(shortcutPath, launchBat);
+                string bat = $"@echo off\ntitle ARK VR - LordMadTrix\ncd /d \"{arkPath}\\ShooterGame\\Binaries\\Win64\"\nstart \"\" \"uevr\\UEVRInjector.exe\"\nstart /high \"\" \"ShooterGame.exe\" -NoBattlEye\nexit\n";
+                File.WriteAllText(Path.Combine(desktop, "ARK VR (FR).cmd"), bat);
             }
-            catch { }
+            catch (Exception ex) { LogLine($"Raccourci Bureau : {ex.Message}", "#FF9800"); }
         }
 
+        // ─── Lancement VR ───────────────────────────────────────────────────────
         private void BtnLaunch_Click(object sender, RoutedEventArgs e)
         {
             string arkPath = TxtGamePath.Text.Trim();
             if (!IsValidArkFolder(arkPath))
             {
-                MessageBox.Show("Dossier ARK invalide. Veuillez vérifier le chemin.", "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show("Dossier ARK invalide. Veuillez verifier le chemin.", "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+                return;
+            }
+
+            string win64 = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64");
+            string injector = Path.Combine(win64, @"uevr\UEVRInjector.exe");
+            string gameExe = Path.Combine(win64, "ShooterGame.exe");
+
+            if (!File.Exists(injector))
+            {
+                var res = System.Windows.MessageBox.Show("UEVR n'est pas installe dans le dossier du jeu.\n\nVoulez-vous lancer l'installation maintenant ?",
+                    "UEVR manquant", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+                if (res == System.Windows.MessageBoxResult.Yes) BtnInstall_Click(sender, e);
                 return;
             }
 
             try
             {
-                string win64 = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64");
-                string injector = Path.Combine(win64, @"uevr\UEVRInjector.exe");
-                string gameExe = Path.Combine(win64, "ShooterGame.exe");
-
-                if (File.Exists(injector))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = injector,
-                        WorkingDirectory = Path.GetDirectoryName(injector)!,
-                        UseShellExecute = true
-                    });
-                }
+                LogLine("Lancement d'ARK en Realite Virtuelle...", "#00F0FF");
+                Process.Start(new ProcessStartInfo { FileName = injector, WorkingDirectory = Path.GetDirectoryName(injector)!, UseShellExecute = true });
 
                 bool highPriority = ChkCpuPriority.IsChecked == true;
-
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = gameExe,
-                    Arguments = "-NoBattlEye",
-                    WorkingDirectory = win64,
-                    UseShellExecute = true
-                };
-
-                var proc = Process.Start(startInfo);
+                var proc = Process.Start(new ProcessStartInfo { FileName = gameExe, Arguments = "-NoBattlEye", WorkingDirectory = win64, UseShellExecute = true });
                 if (proc != null && highPriority)
                 {
-                    try { proc.PriorityClass = ProcessPriorityClass.High; } catch { }
+                    try { proc.PriorityClass = ProcessPriorityClass.High; }
+                    catch (Exception ex) { LogLine($"Priorite CPU : {ex.Message}", "#FF9800"); }
                 }
 
-                UpdateStatus("🥽 Lancement d'ARK en Réalité Virtuelle en cours...", 100);
+                UpdateStatus("ARK VR lance avec succes !", 100);
+                LogLine("ARK VR en cours d'execution.", "#00FF88");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erreur lors du lancement : {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                LogLine($"Erreur lancement : {ex.Message}", "#FF5252");
+                System.Windows.MessageBox.Show($"Erreur lors du lancement : {ex.Message}", "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
+        // ─── Restauration Vanilla ───────────────────────────────────────────────
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string arkPath = TxtGamePath.Text.Trim();
             if (!IsValidArkFolder(arkPath)) return;
 
-            var result = MessageBox.Show(
-                "Voulez-vous restaurer ARK en mode classique écran plat (Vanilla) ?\nVos sauvegardes, mondes et dinosaures ne seront absolument pas touchés.",
-                "Confirmer la restauration",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question
-            );
+            var result = System.Windows.MessageBox.Show(
+                "Voulez-vous restaurer ARK en mode classique ecran plat (Vanilla) ?\nVos sauvegardes, mondes et dinosaures ne seront pas touches.",
+                "Confirmer la restauration", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+            if (result != System.Windows.MessageBoxResult.Yes) return;
 
-            if (result == MessageBoxResult.Yes)
+            try
             {
-                try
-                {
-                    string uevrDir = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64\uevr");
-                    if (Directory.Exists(uevrDir)) Directory.Delete(uevrDir, true);
+                string uevrDir = Path.Combine(arkPath, @"ShooterGame\Binaries\Win64\uevr");
+                if (Directory.Exists(uevrDir)) { Directory.Delete(uevrDir, true); LogLine($"Dossier UEVR supprime : {uevrDir}", "#8FA7B3"); }
 
-                    string appDataUevr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"uevr\profiles\ShooterGame");
-                    if (Directory.Exists(appDataUevr)) Directory.Delete(appDataUevr, true);
+                string appDataUevr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"uevr\profiles\ShooterGame");
+                if (Directory.Exists(appDataUevr)) { Directory.Delete(appDataUevr, true); LogLine("Profil UEVR AppData supprime.", "#8FA7B3"); }
 
-                    UpdateStatus("🔄 Restauration Vanilla effectuée avec succès !", 0);
-                    MessageBox.Show("ARK a été restauré en configuration Vanilla d'origine.", "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Erreur lors de la restauration : {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+                UpdateStatus("Restauration Vanilla effectuee avec succes !", 0);
+                LogLine("ARK restaure en configuration Vanilla d'origine.", "#00FF88");
+                System.Windows.MessageBox.Show("ARK a ete restaure en configuration Vanilla d'origine.", "Succes", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                LogLine($"Erreur restauration : {ex.Message}", "#FF5252");
+                System.Windows.MessageBox.Show($"Erreur lors de la restauration : {ex.Message}", "Erreur", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
             }
         }
 
+        // ─── Helpers ────────────────────────────────────────────────────────────
         private void UpdateStatus(string message, int percent)
         {
             Dispatcher.Invoke(() =>
             {
-                TxtStatus.Text = message;
                 ProgressBar.Value = percent;
                 TxtProgressPercent.Text = $"{percent}%";
+                LogLine(message, percent == 100 ? "#00FF88" : "#8FA7B3");
+            });
+        }
+
+        private void LogLine(string message, string hexColor = "#8FA7B3")
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var color = (WinMedia.Color)WinMedia.ColorConverter.ConvertFromString(hexColor);
+                var tb = new WinControls.TextBlock
+                {
+                    Text = $"[{DateTime.Now:HH:mm:ss}] {message}",
+                    Foreground = new WinMedia.SolidColorBrush(color),
+                    FontFamily = new WinMedia.FontFamily("Consolas"),
+                    FontSize = 11.5
+                };
+                var item = new WinControls.ListBoxItem { Content = tb };
+                LogConsole.Items.Add(item);
+                LogConsole.ScrollIntoView(item);
             });
         }
 
@@ -366,20 +496,11 @@ namespace ArkVRInstaller
         {
             var dir = new DirectoryInfo(sourceDir);
             if (!dir.Exists) return;
-
             Directory.CreateDirectory(destinationDir);
-
             foreach (FileInfo file in dir.GetFiles())
-            {
-                string targetFilePath = Path.Combine(destinationDir, file.Name);
-                file.CopyTo(targetFilePath, true);
-            }
-
+                file.CopyTo(Path.Combine(destinationDir, file.Name), true);
             foreach (DirectoryInfo subDir in dir.GetDirectories())
-            {
-                string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
-                CopyDirectory(subDir.FullName, newDestinationDir);
-            }
+                CopyDirectory(subDir.FullName, Path.Combine(destinationDir, subDir.Name));
         }
     }
 }
