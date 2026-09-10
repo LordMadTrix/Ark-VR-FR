@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AssemblyName>ArkVR-Setup</AssemblyName>
+    <RootNamespace>ArkVRInstaller</RootNamespace>
+    <ApplicationTitle>ARK VR - Installateur &amp; Optimiseur (Édition Française)</ApplicationTitle>
+    <Company>LordMadTrix</Company>
+    <Product>ARK VR Édition Française</Product>
+    <Description>Installateur et optimiseur autonome pour ARK: Survival Evolved en Réalité Virtuelle 6DOF native.</Description>
+    <Version>1.0.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="app.ico" />
+    <Resource Include="app.ico" />
+    <None Remove="payload.zip" />
+    <EmbeddedResource Include="payload.zip" />
+  </ItemGroup>
+
+</Project>
