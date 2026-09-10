@@ -104,13 +104,14 @@ namespace ArkVRInstaller
 
             BtnInstall.IsEnabled = false;
             BtnLaunch.IsEnabled = false;
+            BtnSimulator.IsEnabled = false;
             BtnRestore.IsEnabled = false;
 
             try
             {
                 await Task.Run(() => PerformInstallation(targetPath));
                 MessageBox.Show(
-                    "🎉 Félicitations ! ARK VR (Édition Française) a été installé et configuré avec succès !\n\nVous pouvez désormais allumer votre casque VR et cliquer sur '🥽 LANCER EN VR'.",
+                    "🎉 Félicitations ! ARK VR (Édition Française v1.2.0) a été installé et configuré avec succès !\n\nOptions actives :\n- Rendu Stéréoscopique Synced Sequential\n- Montures Dinosaures 6DOF (T-Rex & Ptéranodon)\n- Viseur Laser Tek 3D et Vignette Anti-Cinétose\n- Optimisations FPS sans nuages bugués\n\nVous pouvez désormais allumer votre casque VR et cliquer sur '🥽 LANCER EN VR'.",
                     "Installation réussie",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information
@@ -129,6 +130,7 @@ namespace ArkVRInstaller
             {
                 BtnInstall.IsEnabled = true;
                 BtnLaunch.IsEnabled = true;
+                BtnSimulator.IsEnabled = true;
                 BtnRestore.IsEnabled = true;
             }
         }
@@ -171,7 +173,7 @@ namespace ArkVRInstaller
                     CopyDirectory(payloadUevr, uevrDestDir);
                 }
 
-                UpdateStatus("Configuration du profil 6DOF & Dinosaures...", 65);
+                UpdateStatus("Configuration du profil 6DOF, Dinosaures & Laser...", 65);
 
                 // 2. Déployer le profil UEVR dans %APPDATA%\uevr\profiles\ShooterGame\
                 string appDataUevr = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"uevr\profiles\ShooterGame");
@@ -188,6 +190,18 @@ namespace ArkVRInstaller
                         if (ChkSyncedSequential.IsChecked == false)
                         {
                             configContent = configContent.Replace("VR_RenderingMethod=1", "VR_RenderingMethod=0");
+                        }
+                        if (ChkVignette.IsChecked == false)
+                        {
+                            configContent = configContent.Replace("VR_ComfortVignette=1", "VR_ComfortVignette=0");
+                        }
+                        if (ChkLaserSight.IsChecked == false)
+                        {
+                            configContent = configContent.Replace("VR_LaserPointerEnabled=1", "VR_LaserPointerEnabled=0");
+                        }
+                        if (ChkPteroRoll.IsChecked == false)
+                        {
+                            configContent = configContent.Replace("VR_FlyingMountBankRoll=1", "VR_FlyingMountBankRoll=0");
                         }
                     });
 
@@ -209,12 +223,12 @@ namespace ArkVRInstaller
                     ApplyEngineTweaks(engineIniPath);
                 }
 
-                // 4. Raccourci Bureau si demandé
+                // 4. Raccourcis Bureau et scripts d'automatisation
                 bool createShortcut = false;
                 Dispatcher.Invoke(() => createShortcut = ChkDesktopShortcut.IsChecked == true);
                 if (createShortcut)
                 {
-                    CreateDesktopShortcut(arkPath);
+                    CreateDesktopShortcuts(arkPath);
                 }
 
                 UpdateStatus("✅ Installation terminée et prête pour la Réalité Virtuelle !", 100);
@@ -232,7 +246,7 @@ namespace ArkVRInstaller
 
         private void ApplyEngineTweaks(string engineIniPath)
         {
-            string tweaks = "\n[SystemSettings]\nr.VolumetricCloud=0\nr.TrueSkyQuality=0\nr.ShadowQuality=2\nr.ContactShadows=0\nr.BloomQuality=1\nr.MotionBlurQuality=0\nr.DepthOfFieldQuality=0\n";
+            string tweaks = "\n[SystemSettings]\nr.VolumetricCloud=0\nr.TrueSkyQuality=0\nr.ShadowQuality=2\nr.ContactShadows=0\nr.LightShaftQuality=0\nr.BloomQuality=1\nr.MotionBlurQuality=0\nr.DepthOfFieldQuality=0\nr.ViewDistanceScale=1.2\nr.Streaming.PoolSize=4096\n";
             if (File.Exists(engineIniPath))
             {
                 string existing = File.ReadAllText(engineIniPath);
@@ -247,13 +261,13 @@ namespace ArkVRInstaller
             }
         }
 
-        private void CreateDesktopShortcut(string arkPath)
+        private void CreateDesktopShortcuts(string arkPath)
         {
             try
             {
                 string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
                 string shortcutPath = Path.Combine(desktop, "ARK VR (FR).cmd");
-                string launchBat = $"@echo off\ncd /d \"{arkPath}\\ShooterGame\\Binaries\\Win64\"\nstart \"\" \"uevr\\UEVRInjector.exe\"\nstart \"\" \"ShooterGame.exe\" -NoBattlEye\nexit\n";
+                string launchBat = $"@echo off\ntitle ARK VR - LordMadTrix\ncd /d \"{arkPath}\\ShooterGame\\Binaries\\Win64\"\nstart \"\" \"uevr\\UEVRInjector.exe\"\nstart /high \"\" \"ShooterGame.exe\" -NoBattlEye\nexit\n";
                 File.WriteAllText(shortcutPath, launchBat);
             }
             catch { }
@@ -284,13 +298,21 @@ namespace ArkVRInstaller
                     });
                 }
 
-                Process.Start(new ProcessStartInfo
+                bool highPriority = ChkCpuPriority.IsChecked == true;
+
+                var startInfo = new ProcessStartInfo
                 {
                     FileName = gameExe,
                     Arguments = "-NoBattlEye",
                     WorkingDirectory = win64,
                     UseShellExecute = true
-                });
+                };
+
+                var proc = Process.Start(startInfo);
+                if (proc != null && highPriority)
+                {
+                    try { proc.PriorityClass = ProcessPriorityClass.High; } catch { }
+                }
 
                 UpdateStatus("🥽 Lancement d'ARK en Réalité Virtuelle en cours...", 100);
             }
@@ -300,13 +322,47 @@ namespace ArkVRInstaller
             }
         }
 
+        private void BtnSimulator_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // Tente d'ouvrir le simulateur web local ou le fichier HTML direct
+                string localUrl = "http://localhost:8080/";
+                string fallbackHtml = @"D:\VR ARK\simulator\index.html";
+
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = localUrl,
+                        UseShellExecute = true
+                    });
+                }
+                catch
+                {
+                    if (File.Exists(fallbackHtml))
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = fallbackHtml,
+                            UseShellExecute = true
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d'ouvrir le simulateur : {ex.Message}", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string arkPath = TxtGamePath.Text.Trim();
             if (!IsValidArkFolder(arkPath)) return;
 
             var result = MessageBox.Show(
-                "Voulez-vous restaurer ARK en mode classique écran plat (Vanilla) ?\nVos sauvegardes, mondes et personnages ne seront absolument pas touchés.",
+                "Voulez-vous restaurer ARK en mode classique écran plat (Vanilla) ?\nVos sauvegardes, mondes et dinosaures ne seront absolument pas touchés.",
                 "Confirmer la restauration",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question

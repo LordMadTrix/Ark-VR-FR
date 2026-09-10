@@ -1,8 +1,8 @@
 <Window x:Class="ArkVRInstaller.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ARK VR - Installateur &amp; Optimiseur (Édition Française) • LordMadTrix"
-        Height="780" Width="840"
+        Title="ARK VR - Installateur &amp; Optimiseur (Édition Française v1.2.0) • LordMadTrix"
+        Height="840" Width="860"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanMinimize"
         Background="#070B0E"
@@ -24,15 +24,15 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="Padding" Value="16" />
-            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Margin" Value="0,0,0,12" />
         </Style>
 
         <Style x:Key="GlowingButton" TargetType="Button">
             <Setter Property="Background" Value="#00E5FF" />
             <Setter Property="Foreground" Value="#051015" />
             <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="Padding" Value="18,12" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="16,11" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Template">
@@ -76,6 +76,28 @@
             </Setter>
         </Style>
 
+        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource GlowingButton}">
+            <Setter Property="Background" Value="#D946EF" />
+            <Setter Property="Foreground" Value="#1A0222" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#E879F9" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#C026D3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="DarkButton" TargetType="Button">
             <Setter Property="Background" Value="#142129" />
             <Setter Property="Foreground" Value="#90CAF9" />
@@ -103,7 +125,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="24">
+    <Grid Margin="22">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -111,7 +133,7 @@
         </Grid.RowDefinitions>
 
         <!-- En-tête / Header -->
-        <Border Grid.Row="0" Margin="0,0,0,16" Background="#0C141A" BorderBrush="#00F0FF" BorderThickness="0,0,0,2" CornerRadius="8,8,0,0" Padding="18,14">
+        <Border Grid.Row="0" Margin="0,0,0,14" Background="#0C141A" BorderBrush="#00F0FF" BorderThickness="0,0,0,2" CornerRadius="8,8,0,0" Padding="18,14">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -121,19 +143,19 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="🦖 ARK VR" FontSize="26" FontWeight="Bold" Foreground="#00F0FF" />
                         <Border Background="#00FF88" CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="ÉDITION FRANÇAISE v1.0.0" FontSize="11" FontWeight="Bold" Foreground="#041F12" />
+                            <TextBlock Text="ÉDITION FRANÇAISE v1.2.0" FontSize="11" FontWeight="Bold" Foreground="#041F12" />
                         </Border>
                     </StackPanel>
-                    <TextBlock Text="Survie Jurassique 6DOF &amp; Rendu Stéréoscopique immersif pour SteamVR / OpenXR" FontSize="13" Foreground="#8FA7B3" Margin="0,4,0,0" />
+                    <TextBlock Text="Survie Jurassique 6DOF, Vol Aérien en Ptéranodon &amp; Rendu Stéréoscopique UEVR" FontSize="13" Foreground="#8FA7B3" Margin="0,4,0,0" />
                 </StackPanel>
-                <Border Grid.Column="1" Background="#14222B" CornerRadius="6" BorderBrush="#00C8FF" BorderThickness="1" Padding="10,6" VerticalAlignment="Center">
+                <Border Grid.Column="1" Background="#14222B" CornerRadius="6" BorderBrush="#00C8FF" BorderThickness="1" Padding="12,6" VerticalAlignment="Center">
                     <TextBlock Text="⚡ Signé LordMadTrix" FontSize="12" FontWeight="Bold" Foreground="#00F0FF" />
                 </Border>
             </Grid>
         </Border>
 
         <!-- Contenu principal -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,14">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12">
             <StackPanel>
 
                 <!-- Carte : Répertoire de jeu -->
@@ -187,15 +209,31 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Carte : Réglages & Optimisations VR -->
+                <!-- Carte : Réglages & Optimisations Avancées -->
                 <Border Style="{StaticResource CardPanel}">
                     <StackPanel>
-                        <TextBlock Text="⚙️ OPTIMISATIONS &amp; MODULES IMMERSIFS VR" FontWeight="Bold" FontSize="13" Foreground="#00F0FF" Margin="0,0,0,10" />
+                        <TextBlock Text="⚙️ MODULES IMMERSIFS &amp; MONTURES 6DOF" FontWeight="Bold" FontSize="13" Foreground="#00F0FF" Margin="0,0,0,10" />
                         
-                        <CheckBox x:Name="ChkDisableClouds" Content="Supprimer les nuages volumétriques bugués (+15 à 25 FPS &amp; anti-double vision)" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="13" />
-                        <CheckBox x:Name="ChkSyncedSequential" Content="Activer le rendu 'Synced Sequential' (Élimine le scintillement d'ombres oeil droit)" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="13" />
-                        <CheckBox x:Name="ChkDinoCamera" Content="Calibrer la caméra 1ère personne pour les montures de Dinosaures et armes 6DOF" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="13" />
-                        <CheckBox x:Name="ChkDesktopShortcut" Content="Créer un raccourci Bureau 'ARK VR (FR)'" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,4" FontSize="13" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <CheckBox x:Name="ChkDisableClouds" Content="Supprimer nuages bugués (+20 FPS)" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkSyncedSequential" Content="Rendu 'Synced Sequential' anti-scintillement" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkDinoCamera" Content="Calibrage selle T-Rex 1ère personne" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkPteroRoll" Content="Vol Ptéranodon : roulis dynamique 6DOF" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,4" FontSize="12.5" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+                                <CheckBox x:Name="ChkVignette" Content="Vignette de confort anti-cinétose" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkLaserSight" Content="Viseur laser Tek 3D projeté" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkCpuPriority" Content="Priorité processeur élevée (CPU High)" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,8" FontSize="12.5" />
+                                <CheckBox x:Name="ChkDesktopShortcut" Content="Créer raccourcis Bureau 'ARK VR (FR)'" IsChecked="True" Foreground="#E0F7FA" Margin="0,0,0,4" FontSize="12.5" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -220,11 +258,13 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Button x:Name="BtnInstall" Grid.Column="0" Content="🦖 INSTALLER ARK VR (FR)" Style="{StaticResource EmeraldButton}" Margin="0,0,12,0" Click="BtnInstall_Click" />
-            <Button x:Name="BtnLaunch" Grid.Column="1" Content="🥽 LANCER EN VR" Style="{StaticResource GlowingButton}" Margin="0,0,12,0" Click="BtnLaunch_Click" />
-            <Button x:Name="BtnRestore" Grid.Column="2" Content="🔄 Restaurer Vanilla" Style="{StaticResource DarkButton}" Click="BtnRestore_Click" />
+            <Button x:Name="BtnInstall" Grid.Column="0" Content="🦖 INSTALLER ARK VR (FR)" Style="{StaticResource EmeraldButton}" Margin="0,0,10,0" Click="BtnInstall_Click" />
+            <Button x:Name="BtnLaunch" Grid.Column="1" Content="🥽 LANCER EN VR" Style="{StaticResource GlowingButton}" Margin="0,0,10,0" Click="BtnLaunch_Click" />
+            <Button x:Name="BtnSimulator" Grid.Column="2" Content="🌐 SIMULATEUR 3D" Style="{StaticResource PurpleButton}" Margin="0,0,10,0" Click="BtnSimulator_Click" />
+            <Button x:Name="BtnRestore" Grid.Column="3" Content="🔄 Restaurer Vanilla" Style="{StaticResource DarkButton}" Click="BtnRestore_Click" />
         </Grid>
     </Grid>
 </Window>
