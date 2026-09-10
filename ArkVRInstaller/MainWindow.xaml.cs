@@ -104,7 +104,6 @@ namespace ArkVRInstaller
 
             BtnInstall.IsEnabled = false;
             BtnLaunch.IsEnabled = false;
-            BtnSimulator.IsEnabled = false;
             BtnRestore.IsEnabled = false;
 
             try
@@ -130,7 +129,6 @@ namespace ArkVRInstaller
             {
                 BtnInstall.IsEnabled = true;
                 BtnLaunch.IsEnabled = true;
-                BtnSimulator.IsEnabled = true;
                 BtnRestore.IsEnabled = true;
             }
         }
@@ -322,40 +320,6 @@ namespace ArkVRInstaller
             }
         }
 
-        private void BtnSimulator_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Tente d'ouvrir le simulateur web local ou le fichier HTML direct
-                string localUrl = "http://localhost:8080/";
-                string fallbackHtml = @"D:\VR ARK\simulator\index.html";
-
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = localUrl,
-                        UseShellExecute = true
-                    });
-                }
-                catch
-                {
-                    if (File.Exists(fallbackHtml))
-                    {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = fallbackHtml,
-                            UseShellExecute = true
-                        });
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Impossible d'ouvrir le simulateur : {ex.Message}", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string arkPath = TxtGamePath.Text.Trim();
@@ -419,3 +383,4 @@ namespace ArkVRInstaller
         }
     }
 }
+

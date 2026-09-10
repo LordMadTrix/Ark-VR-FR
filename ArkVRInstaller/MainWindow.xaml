@@ -76,27 +76,6 @@
             </Setter>
         </Style>
 
-        <Style x:Key="PurpleButton" TargetType="Button" BasedOn="{StaticResource GlowingButton}">
-            <Setter Property="Background" Value="#D946EF" />
-            <Setter Property="Foreground" Value="#1A0222" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E879F9" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#C026D3" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
 
         <Style x:Key="DarkButton" TargetType="Button">
             <Setter Property="Background" Value="#142129" />
@@ -258,13 +237,13 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <Button x:Name="BtnInstall" Grid.Column="0" Content="🦖 INSTALLER ARK VR (FR)" Style="{StaticResource EmeraldButton}" Margin="0,0,10,0" Click="BtnInstall_Click" />
             <Button x:Name="BtnLaunch" Grid.Column="1" Content="🥽 LANCER EN VR" Style="{StaticResource GlowingButton}" Margin="0,0,10,0" Click="BtnLaunch_Click" />
-            <Button x:Name="BtnSimulator" Grid.Column="2" Content="🌐 SIMULATEUR 3D" Style="{StaticResource PurpleButton}" Margin="0,0,10,0" Click="BtnSimulator_Click" />
-            <Button x:Name="BtnRestore" Grid.Column="3" Content="🔄 Restaurer Vanilla" Style="{StaticResource DarkButton}" Click="BtnRestore_Click" />
+            <Button x:Name="BtnRestore" Grid.Column="2" Content="🔄 Restaurer Vanilla" Style="{StaticResource DarkButton}" Click="BtnRestore_Click" />
         </Grid>
     </Grid>
 </Window>
+
+
