@@ -11,12 +11,18 @@ VR_SnapTurnAngle=45.000000
 VR_OpenXR=1
 VR_MotionControls_ControllerType=0
 VR_UObjectHook=1
+VR_ComfortVignette=1
+VR_ComfortVignetteIntensity=0.600000
+VR_FlyingMountBankRoll=1
+VR_LaserPointerEnabled=1
 
 [Camera]
 VR_CameraForwardOffset=0.000000
 VR_CameraRightOffset=0.000000
 VR_CameraUpOffset=0.000000
 VR_CameraWorldScale=1.000000
+VR_DinoSaddleOffsetY=0.950000
+VR_PteranodonOffsetY=0.750000
 
 [UI]
 VR_UI_Distance=2.200000

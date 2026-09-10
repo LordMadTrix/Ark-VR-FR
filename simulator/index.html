@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARK VR 3D Simulator v1.1 • Vol Ptéranodon &amp; T-Rex • LordMadTrix</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { background-color: #040709; color: #E0F7FA; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
+        #webgl-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #vr-lens-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; display: none; }
+        .lens-mask { position: absolute; top: 0; height: 100%; width: 50%; box-shadow: inset 0 0 120px 40px rgba(0,0,0,0.95); border-right: 2px solid rgba(0, 240, 255, 0.4); }
+        .lens-left { left: 0; } .lens-right { left: 50%; }
+        .eye-label { position: absolute; bottom: 30px; font-weight: 800; font-size: 12px; letter-spacing: 2px; color: #00F0FF; background: rgba(8, 16, 22, 0.85); padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(0, 240, 255, 0.4); box-shadow: 0 0 15px rgba(0, 240, 255, 0.2); }
+        .lens-left .eye-label { left: 50%; transform: translateX(-50%); }
+        .lens-right .eye-label { left: 50%; transform: translateX(-50%); }
+        #comfort-vignette { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; background: radial-gradient(circle, transparent 45%, rgba(0,0,0,0.85) 90%); opacity: 0; transition: opacity 0.3s ease; }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .interactive { pointer-events: auto; }
+        .header-badge { position: absolute; top: 20px; left: 24px; background: rgba(10, 18, 24, 0.9); backdrop-filter: blur(10px); border: 1px solid #1A2E3B; border-left: 4px solid #00F0FF; border-radius: 8px; padding: 12px 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+        .header-title { font-size: 17px; font-weight: 800; color: #00F0FF; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+        .header-sub { font-size: 11px; color: #8FA7B3; margin-top: 2px; }
+        .author-tag { background: rgba(0, 255, 136, 0.15); color: #00FF88; font-weight: bold; font-size: 11px; padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(0, 255, 136, 0.4); }
+        .telemetry-card { position: absolute; top: 20px; right: 24px; background: rgba(10, 18, 24, 0.9); backdrop-filter: blur(10px); border: 1px solid #1A2E3B; border-radius: 8px; padding: 14px 18px; font-size: 12px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+        .telemetry-row { display: flex; justify-content: space-between; gap: 20px; }
+        .val-highlight { font-weight: bold; color: #00FF88; }
+        .controls-card { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); background: rgba(8, 15, 20, 0.92); backdrop-filter: blur(14px); border: 1px solid rgba(0, 240, 255, 0.35); border-radius: 12px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(0, 240, 255, 0.2); max-width: 95vw; overflow-x: auto; }
+        .btn-mode { background: #121F28; color: #E0F7FA; border: 1px solid #203B4C; padding: 9px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; white-space: nowrap; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .btn-mode:hover { background: #1A2F3D; border-color: #00F0FF; color: #00F0FF; transform: translateY(-2px); }
+        .btn-mode.active { background: #00F0FF; color: #030E14; border-color: #00F0FF; box-shadow: 0 0 16px rgba(0, 240, 255, 0.5); font-weight: bold; }
+        .btn-emerald.active { background: #00FF88; color: #02170E; border-color: #00FF88; box-shadow: 0 0 16px rgba(0, 255, 136, 0.5); }
+        .btn-purple.active { background: #D946EF; color: #1A0322; border-color: #D946EF; box-shadow: 0 0 16px rgba(217, 70, 239, 0.5); }
+        #uevr-menu-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; background: rgba(8, 14, 18, 0.96); border: 1px solid #00F0FF; border-radius: 10px; box-shadow: 0 0 45px rgba(0, 240, 255, 0.4); padding: 22px; z-index: 20; display: none; pointer-events: auto; }
+        .uevr-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(0, 240, 255, 0.3); padding-bottom: 10px; margin-bottom: 16px; }
+        .uevr-title { color: #00F0FF; font-weight: bold; font-size: 15px; }
+        .uevr-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px; }
+        .uevr-close { cursor: pointer; color: #FF5252; font-weight: bold; font-size: 14px; }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 8px; height: 8px; border: 2px solid #00FF88; border-radius: 50%; pointer-events: none; z-index: 4; box-shadow: 0 0 10px #00FF88; }
+    </style>
+</head>
+<body>
+    <div id="vr-lens-overlay">
+        <div class="lens-mask lens-left"><div class="eye-label">ŒIL GAUCHE (VR 6DOF)</div></div>
+        <div class="lens-mask lens-right"><div class="eye-label">ŒIL DROIT (VR 6DOF)</div></div>
+    </div>
+    <div id="comfort-vignette"></div>
+    <div id="crosshair"></div>
+    <div id="ui-container">
+        <div class="header-badge">
+            <div>
+                <div class="header-title">🦖 ARK VR • SIMULATEUR 3D v1.1</div>
+                <div class="header-sub">Rendu Stéréoscopique UEVR • Monture T-Rex &amp; Vol Ptéranodon</div>
+            </div>
+            <div class="author-tag">LordMadTrix</div>
+        </div>
+        <div class="telemetry-card">
+            <div class="telemetry-row"><span style="color:#8FA7B3;">Fréquence VR :</span><span class="val-highlight" id="fps-counter">90 FPS (Sync)</span></div>
+            <div class="telemetry-row"><span style="color:#8FA7B3;">Mode Caméra :</span><span style="color:#00F0FF;" id="mount-status">À Pied (Sol)</span></div>
+            <div class="telemetry-row"><span style="color:#8FA7B3;">Vignette Confort :</span><span class="val-highlight" id="vignette-status">Active (0.6x)</span></div>
+            <div class="telemetry-row"><span style="color:#8FA7B3;">Cycle Jour/Nuit :</span><span style="color:#FFB300;" id="time-status">Jour (Soleil)</span></div>
+            <div class="telemetry-row"><span style="color:#8FA7B3;">Audio Immersif :</span><span style="color:#00FF88;" id="audio-status">Actif (Biomes)</span></div>
+        </div>
+        <div id="uevr-menu-overlay" class="interactive">
+            <div class="uevr-header">
+                <div class="uevr-title">⚙️ UEVR In-Game Overlay (Touche 'Inser')</div>
+                <div class="uevr-close" onclick="toggleUevrMenu()">✕ Fermer</div>
+            </div>
+            <div class="uevr-row"><span>Rendering Method :</span><span style="color:#00FF88;">Synced Sequential</span></div>
+            <div class="uevr-row"><span>Motion Controls :</span><span style="color:#00FF88;">Enabled (6DOF Decoupled)</span></div>
+            <div class="uevr-row"><span>Pteranodon Flight Roll :</span><span style="color:#00F0FF;">Enabled (Aérien)</span></div>
+            <div class="uevr-row"><span>T-Rex Saddle Offset Y :</span><span style="color:#00F0FF;">+0.95m (Eye Level)</span></div>
+            <div class="uevr-row"><span>Comfort Vignette On Turn :</span><span style="color:#00FF88;">Enabled</span></div>
+            <div class="uevr-row"><span>Volumetric Clouds :</span><span style="color:#00FF88;">Disabled (r.VolumetricCloud 0)</span></div>
+            <button class="btn-mode active" style="width:100%; margin-top:12px;" onclick="toggleUevrMenu()">Sauvegarder &amp; Reprendre</button>
+        </div>
+        <div class="controls-card interactive">
+            <button class="btn-mode active" id="btn-mode-mono" onclick="setMode('mono')">🖥️ Vue Écran PC</button>
+            <button class="btn-mode" id="btn-mode-sbs" onclick="setMode('sbs')">🥽 Vue Casque VR (Stéréo)</button>
+            <button class="btn-mode btn-emerald" id="btn-mount-rex" onclick="setMount('rex')">🦖 Monter T-Rex</button>
+            <button class="btn-mode btn-purple" id="btn-mount-ptero" onclick="setMount('ptero')">🦅 Voler Ptéranodon</button>
+            <button class="btn-mode" id="btn-mount-foot" onclick="setMount('foot')">🚶 À Pied</button>
+            <button class="btn-mode" id="btn-toggle-laser" onclick="toggleLaser()">🎯 Laser Tek : ON</button>
+            <button class="btn-mode" id="btn-toggle-daynight" onclick="toggleDayNight()">🌓 Jour / Nuit</button>
+            <button class="btn-mode" id="btn-toggle-sound" onclick="toggleSound()">🔊 Audio VR</button>
+            <button class="btn-mode" onclick="toggleUevrMenu()">⚙️ Menu UEVR (Inser)</button>
+        </div>
+    </div>
+    <canvas id="webgl-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('webgl-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x060c10);
+        scene.fog = new THREE.FogExp2(0x07151e, 0.016);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 1.7, 4);
+
+        const leftCamera = new THREE.PerspectiveCamera(75, (window.innerWidth / 2) / window.innerHeight, 0.1, 1000);
+        const rightCamera = new THREE.PerspectiveCamera(75, (window.innerWidth / 2) / window.innerHeight, 0.1, 1000);
+        const IPD = 0.064;
+
+        const ambientLight = new THREE.AmbientLight(0x223a48, 1.3);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff0d0, 1.9);
+        sunLight.position.set(40, 60, -25);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        const tekLight = new THREE.PointLight(0x00f0ff, 4, 70);
+        tekLight.position.set(0, 25, -45);
+        scene.add(tekLight);
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(300, 300, 32, 32),
+            new THREE.MeshStandardMaterial({ color: 0x16241b, roughness: 0.9, metalness: 0.1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        function createTree(x, z, scale = 1) {
+            const group = new THREE.Group();
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.35 * scale, 0.55 * scale, 6 * scale, 6),
+                new THREE.MeshStandardMaterial({ color: 0x3d271d, roughness: 0.9 })
+            );
+            trunk.position.y = 3 * scale;
+            trunk.castShadow = true;
+            group.add(trunk);
+
+            const foliage = new THREE.Mesh(
+                new THREE.ConeGeometry(3.5 * scale, 7 * scale, 6),
+                new THREE.MeshStandardMaterial({ color: 0x1b4329, roughness: 0.8 })
+            );
+            foliage.position.y = 6.5 * scale;
+            foliage.castShadow = true;
+            group.add(foliage);
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+        }
+
+        for (let i = 0; i < 50; i++) {
+            const x = (Math.random() - 0.5) * 160;
+            const z = (Math.random() - 0.5) * 160 - 20;
+            if (Math.abs(x) > 7 || Math.abs(z) > 7) {
+                createTree(x, z, 0.7 + Math.random() * 0.9);
+            }
+        }
+
+        const obeliskGroup = new THREE.Group();
+        const obelisk = new THREE.Mesh(
+            new THREE.OctahedronGeometry(7, 0),
+            new THREE.MeshStandardMaterial({ color: 0x0a161e, emissive: 0x00c8ff, emissiveIntensity: 0.9, metalness: 0.95, roughness: 0.15 })
+        );
+        obelisk.scale.set(1.2, 4.0, 1.2);
+        obeliskGroup.add(obelisk);
+
+        const beam = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.5, 140, 16),
+            new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.65 })
+        );
+        beam.position.y = -35;
+        obeliskGroup.add(beam);
+        obeliskGroup.position.set(0, 42, -55);
+        scene.add(obeliskGroup);
+
+        const trexGroup = new THREE.Group();
+        const rexMat = new THREE.MeshStandardMaterial({ color: 0x3b3a32, roughness: 0.85 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 5.5), rexMat);
+        body.position.set(0, 4.2, 0);
+        body.castShadow = true;
+        trexGroup.add(body);
+
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.8, 2.5), rexMat);
+        neck.position.set(0, 5.5, 3.2); neck.rotation.x = 0.3;
+        trexGroup.add(neck);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.2, 3.2), rexMat);
+        head.position.set(0, 6.4, 4.8);
+        trexGroup.add(head);
+
+        const jaw = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.8, 2.8), rexMat);
+        jaw.position.set(0, 5.3, 4.8);
+        trexGroup.add(jaw);
+
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(1.4, 7, 6), rexMat);
+        tail.position.set(0, 4.2, -5.5); tail.rotation.x = -1.4;
+        trexGroup.add(tail);
+
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x2e2d26, roughness: 0.9 });
+        const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 4.2), legMat);
+        leftLeg.position.set(-1.4, 2.1, 0); trexGroup.add(leftLeg);
+        const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 4.2), legMat);
+        rightLeg.position.set(1.4, 2.1, 0); trexGroup.add(rightLeg);
+
+        const saddle = new THREE.Mesh(
+            new THREE.BoxGeometry(1.8, 0.5, 2.0),
+            new THREE.MeshStandardMaterial({ color: 0x0f222b, emissive: 0x00f0ff, emissiveIntensity: 0.5 })
+        );
+        saddle.position.set(0, 5.9, 0.5);
+        trexGroup.add(saddle);
+        trexGroup.position.set(0, 0, -8);
+        scene.add(trexGroup);
+
+        const pteroGroup = new THREE.Group();
+        const pteroMat = new THREE.MeshStandardMaterial({ color: 0x6e3b24, roughness: 0.8 });
+        const pBody = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 2.2), pteroMat);
+        pteroGroup.add(pBody);
+        const pHead = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.8, 4), pteroMat);
+        pHead.position.set(0, 0.4, 1.8); pHead.rotation.x = 1.6;
+        pteroGroup.add(pHead);
+
+        const leftWing = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.08, 1.4), pteroMat);
+        leftWing.position.set(-2.2, 0, 0); pteroGroup.add(leftWing);
+        const rightWing = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.08, 1.4), pteroMat);
+        rightWing.position.set(2.2, 0, 0); pteroGroup.add(rightWing);
+
+        const pSaddle = new THREE.Mesh(
+            new THREE.BoxGeometry(0.7, 0.3, 0.9),
+            new THREE.MeshStandardMaterial({ color: 0x112b38, emissive: 0xd946ef, emissiveIntensity: 0.6 })
+        );
+        pSaddle.position.set(0, 0.5, 0);
+        pteroGroup.add(pSaddle);
+        pteroGroup.position.set(0, 18, -25);
+        scene.add(pteroGroup);
+
+        const handsGroup = new THREE.Group();
+        const rightHandGroup = new THREE.Group();
+        const rifle = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.22, 1.2),
+            new THREE.MeshStandardMaterial({ color: 0x1a2630, emissive: 0x00f0ff, emissiveIntensity: 0.7, metalness: 0.85 })
+        );
+        rifle.position.set(0, 0, -0.4);
+        rightHandGroup.add(rifle);
+
+        const laserGeo = new THREE.CylinderGeometry(0.006, 0.006, 50, 8);
+        const laserMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.85 });
+        const laser = new THREE.Mesh(laserGeo, laserMat);
+        laser.position.set(0, 0.08, -25.5);
+        laser.rotation.x = Math.PI / 2;
+        rightHandGroup.add(laser);
+
+        rightHandGroup.position.set(0.35, -0.25, -0.6);
+        handsGroup.add(rightHandGroup);
+
+        const leftHandGroup = new THREE.Group();
+        const gps = new THREE.Mesh(
+            new THREE.BoxGeometry(0.2, 0.05, 0.3),
+            new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.6 })
+        );
+        leftHandGroup.add(gps);
+        leftHandGroup.position.set(-0.35, -0.28, -0.6);
+        handsGroup.add(leftHandGroup);
+
+        camera.add(handsGroup);
+        scene.add(camera);
+
+        let currentMode = 'mono';
+        let currentMount = 'foot';
+        let isNight = false;
+        let laserEnabled = true;
+        let soundActive = true;
+        let mouseX = 0, mouseY = 0;
+        let targetRotY = 0, targetRotX = 0;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+            mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+            targetRotY = -mouseX * 1.3;
+            targetRotX = -mouseY * 0.8;
+
+            const vignette = document.getElementById('comfort-vignette');
+            const turnSpeed = Math.abs(mouseX) + Math.abs(mouseY);
+            if (turnSpeed > 0.4) {
+                vignette.style.opacity = Math.min((turnSpeed - 0.4) * 1.5, 0.75);
+            } else {
+                vignette.style.opacity = 0;
+            }
+        });
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-mode-mono').classList.toggle('active', mode === 'mono');
+            document.getElementById('btn-mode-sbs').classList.toggle('active', mode === 'sbs');
+            document.getElementById('vr-lens-overlay').style.display = mode === 'sbs' ? 'block' : 'none';
+        }
+
+        function setMount(mount) {
+            currentMount = mount;
+            document.getElementById('btn-mount-rex').classList.toggle('active', mount === 'rex');
+            document.getElementById('btn-mount-ptero').classList.toggle('active', mount === 'ptero');
+            document.getElementById('btn-mount-foot').classList.toggle('active', mount === 'foot');
+
+            const status = document.getElementById('mount-status');
+            if (mount === 'rex') {
+                status.innerText = '🦖 T-Rex Selle 1ère Personne (VR 6DOF)';
+                status.style.color = '#00FF88';
+                playSynthSound('roar');
+            } else if (mount === 'ptero') {
+                status.innerText = '🦅 Ptéranodon Vol Aérien (Roulis 6DOF)';
+                status.style.color = '#D946EF';
+                playSynthSound('wing');
+            } else {
+                status.innerText = '🚶 À Pied (Sol)';
+                status.style.color = '#00F0FF';
+            }
+        }
+
+        function toggleLaser() {
+            laserEnabled = !laserEnabled;
+            laser.visible = laserEnabled;
+            const btn = document.getElementById('btn-toggle-laser');
+            btn.innerText = laserEnabled ? '🎯 Laser Tek : ON' : '🎯 Laser Tek : OFF';
+            btn.classList.toggle('active', laserEnabled);
+            playSynthSound('laser');
+        }
+
+        function toggleDayNight() {
+            isNight = !isNight;
+            const status = document.getElementById('time-status');
+            if (isNight) {
+                scene.background = new THREE.Color(0x020406);
+                scene.fog.color = new THREE.Color(0x03070b);
+                sunLight.intensity = 0.2;
+                ambientLight.intensity = 0.4;
+                tekLight.intensity = 6;
+                status.innerText = 'Nuit (Tek Bioluminescent)';
+                status.style.color = '#00F0FF';
+            } else {
+                scene.background = new THREE.Color(0x060c10);
+                scene.fog.color = new THREE.Color(0x07151e);
+                sunLight.intensity = 1.9;
+                ambientLight.intensity = 1.3;
+                tekLight.intensity = 4;
+                status.innerText = 'Jour (Soleil)';
+                status.style.color = '#FFB300';
+            }
+        }
+
+        function toggleUevrMenu() {
+            const overlay = document.getElementById('uevr-menu-overlay');
+            overlay.style.display = overlay.style.display === 'block' ? 'none' : 'block';
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Insert' || e.key === 'Inser') {
+                toggleUevrMenu();
+            }
+        });
+
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        function playSynthSound(type) {
+            if (!soundActive) return;
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') ctx.resume();
+
+                if (type === 'laser') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.15);
+                } else if (type === 'roar') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(90, ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(45, ctx.currentTime + 0.6);
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.6);
+                } else if (type === 'wing') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(120, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.start(); osc.stop(ctx.currentTime + 0.3);
+                }
+            } catch (e) { }
+        }
+
+        function toggleSound() {
+            soundActive = !soundActive;
+            const btn = document.getElementById('btn-toggle-sound');
+            const status = document.getElementById('audio-status');
+            btn.innerText = soundActive ? '🔊 Audio VR' : '🔇 Muet';
+            status.innerText = soundActive ? 'Actif (Biomes)' : 'Désactivé';
+            status.style.color = soundActive ? '#00FF88' : '#FF5252';
+        }
+
+        let clock = new THREE.Clock();
+        let pteroAngle = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            obeliskGroup.rotation.y += 0.01;
+            obeliskGroup.position.y = 42 + Math.sin(time * 1.5) * 1.2;
+
+            head.rotation.y = Math.sin(time * 1.3) * 0.12;
+            head.position.y = 6.4 + Math.sin(time * 2.2) * 0.08;
+            jaw.rotation.x = Math.max(0, Math.sin(time * 1.3) * 0.15);
+            tail.rotation.y = Math.cos(time * 1.5) * 0.22;
+
+            pteroAngle += delta * 0.45;
+            const pteroRadius = 38;
+            pteroGroup.position.x = Math.cos(pteroAngle) * pteroRadius;
+            pteroGroup.position.z = Math.sin(pteroAngle) * pteroRadius - 20;
+            pteroGroup.position.y = 20 + Math.sin(time * 2.5) * 1.5;
+            pteroGroup.rotation.y = -pteroAngle - Math.PI / 2;
+            pteroGroup.rotation.z = Math.sin(time * 2.5) * 0.25;
+
+            const wingFlap = Math.sin(time * 6.5) * 0.35;
+            leftWing.rotation.z = wingFlap;
+            rightWing.rotation.z = -wingFlap;
+
+            if (currentMount === 'rex') {
+                const rexSaddlePos = new THREE.Vector3();
+                saddle.getWorldPosition(rexSaddlePos);
+                rexSaddlePos.y += 0.95;
+                camera.position.lerp(rexSaddlePos, 0.12);
+            } else if (currentMount === 'ptero') {
+                const pSaddlePos = new THREE.Vector3();
+                pSaddle.getWorldPosition(pSaddlePos);
+                pSaddlePos.y += 0.75;
+                camera.position.lerp(pSaddlePos, 0.15);
+                camera.rotation.z = pteroGroup.rotation.z * 0.8;
+            } else {
+                const groundPos = new THREE.Vector3(0, 1.7, 4);
+                camera.position.lerp(groundPos, 0.12);
+                camera.rotation.z = 0;
+            }
+
+            camera.rotation.y += (targetRotY - camera.rotation.y) * 0.1;
+            camera.rotation.x += (targetRotX - camera.rotation.x) * 0.1;
+
+            rightHandGroup.rotation.x = Math.sin(time * 2.5) * 0.04 + targetRotX * 0.6;
+            rightHandGroup.rotation.y = targetRotY * 0.6;
+
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            if (currentMode === 'mono') {
+                renderer.setViewport(0, 0, width, height);
+                renderer.setScissor(0, 0, width, height);
+                renderer.setScissorTest(false);
+                renderer.render(scene, camera);
+            } else {
+                const halfWidth = width / 2;
+                renderer.setScissorTest(true);
+
+                leftCamera.position.copy(camera.position);
+                leftCamera.quaternion.copy(camera.quaternion);
+                leftCamera.translateX(-IPD / 2);
+                renderer.setViewport(0, 0, halfWidth, height);
+                renderer.setScissor(0, 0, halfWidth, height);
+                renderer.render(scene, leftCamera);
+
+                rightCamera.position.copy(camera.position);
+                rightCamera.quaternion.copy(camera.quaternion);
+                rightCamera.translateX(IPD / 2);
+                renderer.setViewport(halfWidth, 0, halfWidth, height);
+                renderer.setScissor(halfWidth, 0, halfWidth, height);
+                renderer.render(scene, rightCamera);
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            camera.aspect = w / h; camera.updateProjectionMatrix();
+            leftCamera.aspect = (w / 2) / h; leftCamera.updateProjectionMatrix();
+            rightCamera.aspect = (w / 2) / h; rightCamera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
