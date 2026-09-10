@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Windows;
 using WinMedia = System.Windows.Media;
-using WinForms = System.Windows.Forms;
 using WinControls = System.Windows.Controls;
 
 namespace ArkVRInstaller
@@ -326,18 +325,19 @@ namespace ArkVRInstaller
         // ─── Navigation ─────────────────────────────────────────────────────────
         private void BtnBrowse_Click(object sender, RoutedEventArgs e)
         {
-            using var dialog = new WinForms.FolderBrowserDialog
+            // OpenFolderDialog WPF natif (.NET 8+) — remplace WinForms.FolderBrowserDialog
+            var dialog = new Microsoft.Win32.OpenFolderDialog
             {
-                Description = "Selectionnez le dossier racine d'ARK: Survival Evolved",
-                UseDescriptionForTitle = true
+                Title = "Selectionnez le dossier racine d'ARK: Survival Evolved",
+                Multiselect = false
             };
             if (!string.IsNullOrEmpty(TxtGamePath.Text) && Directory.Exists(TxtGamePath.Text))
-                dialog.SelectedPath = TxtGamePath.Text;
+                dialog.InitialDirectory = TxtGamePath.Text;
 
-            if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            if (dialog.ShowDialog() == true)
             {
-                TxtGamePath.Text = dialog.SelectedPath;
-                ValidateArkPath(dialog.SelectedPath);
+                TxtGamePath.Text = dialog.FolderName;
+                ValidateArkPath(dialog.FolderName);
             }
         }
 
