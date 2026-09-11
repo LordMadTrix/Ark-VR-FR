@@ -33,3 +33,22 @@
 <p align="center">
   <b>Signé LordMadTrix — Édition Française Officielle</b>
 </p>
+
+---
+
+## 🥽 Guide Casque VR : Que faire une fois dans le casque ?
+
+### 1. Connexion initiale du casque au PC
+1. **Allumez votre Meta Quest 3** (ou casque PCVR).
+2. Lancez votre liaison : **ALVR**, **Virtual Desktop** ou **Quest Link**.
+3. Vérifiez que vous êtes dans l'environnement virtuel **SteamVR**.
+
+### 2. Lancement & Auto-Injection
+- Sur votre PC, lancez `ArkVR-Setup.exe` et cliquez sur **🚀 LANCER EN VR**.
+- L'injecteur Win32 automatique injecte le module VR dans les 5 secondes suivant le chargement du moteur 3D : **vous n'avez rien à manipuler sur le PC !**
+
+### 3. Contrôles & Réflexes dans le casque
+- **Recentrer la vue 6DOF** : Maintenez le bouton **Meta** (manette droite) 2 secondes.
+- **Ouvrir le menu VR en jeu (UEVR)** : Enfoncez **les deux sticks analogiques simultanément (L3 + R3)** pour ajuster la position de la caméra ou les options.
+- **Montures & Dinosaures** : Montez sur vos créatures avec la touche d'action habituelle. En vol sur un Ptéranodon, la vue 6DOF s'adapte à votre inclinaison de tête.
+- **Overlay Neuronal DLSS 5** : Appuyez sur **F8** sur votre clavier pour afficher le panneau de super-résolution transparent au-dessus du jeu.
