@@ -4,7 +4,7 @@ title ARK VR - Lancement Haute Performance (LordMadTrix)
 color 0a
 
 echo ====================================================================
-echo   🥽 LANCEMENT D'ARK EN RÉALITÉ VIRTUELLE (LORDMADTRIX)
+echo   ? ? ? ? ? ? ? / ? ? ?   ? ?  -  LANCEMENT AUTO-INJECTION ZERO-CLIC
 echo ====================================================================
 echo.
 
@@ -14,18 +14,23 @@ if not exist "%ARK_DIR%\ShooterGame\Binaries\Win64\ShooterGame.exe" (
 )
 
 set "WIN64=%ARK_DIR%\ShooterGame\Binaries\Win64"
-set "INJECTOR=%WIN64%\uevr\UEVRInjector.exe"
+set "UEVR_DLL=%WIN64%\uevr\UEVRBackend.dll"
 
-if exist "%INJECTOR%" (
-    echo [1/2] Démarrage de l'injecteur UEVR OpenXR...
-    start "" "%INJECTOR%"
+:: 1. D?marrage de SteamVR si inactif
+tasklist | findstr /i "vrserver.exe" >nul || start "" "steam://run/250820"
+
+:: 2. Lancement de la surveillance d'auto-injection en t?che de fond invisible
+if exist "%~dp0AutoInject-ArkVR.ps1" (
+    start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0AutoInject-ArkVR.ps1" -DllPath "%UEVR_DLL%"
 )
 
-echo [2/2] Lancement de ShooterGame.exe en priorité élevée (-NoBattlEye)...
+:: 3. Lancement de ShooterGame en priorit? ?lev?e
+echo Lancement d'ARK: Survival Evolved (-NoBattlEye)...
 cd /d "%WIN64%"
 start /high "" "ShooterGame.exe" -NoBattlEye
 
 echo.
-echo Bon jeu en immersion VR dans l'univers d'ARK !
+echo [OK] Auto-injection UEVR arm?e en t?che de fond !
+echo Le jeu basculera directement en VR 6DOF dans votre casque.
 timeout /t 3 >nul
 exit

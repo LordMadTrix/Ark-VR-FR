@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,23 +15,13 @@
     <Description>Installateur et optimiseur autonome pour ARK: Survival Evolved en Realite Virtuelle 6DOF native.</Description>
     <Version>1.4.0.0</Version>
     <FileVersion>1.4.0.0</FileVersion>
-
-    <!-- Compression maximale du single-file (sans trimming WPF incompatible) -->
-    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <!-- ReadyToRun desactive = EXE plus petit (pas de code natif pre-compile) -->
-    <PublishReadyToRun>false</PublishReadyToRun>
-    <!-- Supprime les symboles de debug pour reduire la taille -->
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
-    <!-- Optimisation du compilateur IL -->
-    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="app.ico" />
     <Resource Include="app.ico" />
-    <None Remove="payload.zip" />
-    <EmbeddedResource Include="payload.zip" />
+    <EmbeddedResource Include="payload.zip">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
