@@ -1462,6 +1462,27 @@ namespace ArkVRInstaller
 
 
 
+                private void BtnOpenDLSS5_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string dlss5Exe = @"D:\ROG_Tools\DLSS5-Swapper\DLSS5-Swapper.exe";
+                if (File.Exists(dlss5Exe))
+                {
+                    Process.Start(new ProcessStartInfo { FileName = dlss5Exe, WorkingDirectory = Path.GetDirectoryName(dlss5Exe), UseShellExecute = true });
+                    LogLine("[DLSS] DLSS 5 Swapper v2.2.1 ouvert. (En jeu, appuyez sur F8 pour l'overlay)", "#00FF88");
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo("https://github.com/rakanki911/DLSS5-Swapper/releases/tag/v2.2.1") { UseShellExecute = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible de lancer DLSS 5 Swapper :\n{ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         // Ouvre la page de téléchargement ALVR
 
 
